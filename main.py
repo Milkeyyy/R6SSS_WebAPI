@@ -73,7 +73,7 @@ def cron_task(event):
 	serverstatus.update_status()
 	return "Server Status Updated: " + str(serverstatus.data)
 
-@app.get("/api")
+@app.get("/")
 async def get_serverstatus(platform: List[str] = Query(default=None)):
 	status = {}
 
