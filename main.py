@@ -1,16 +1,14 @@
-import concurrent.futures
 import datetime
 import json
 import logging
-from time import sleep
 from typing import List
 from urllib import request
 
-import schedule
 from deta import App
 from fastapi import FastAPI, Query
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
+
 
 class serverstatus:
 	# サーバーステータスAPIのURL
@@ -18,18 +16,6 @@ class serverstatus:
 	pc_api_url = "https://game-status-api.ubisoft.com/v1/instances?appIds=e3d5ea9e-50bd-43b7-88bf-39794f4e3d40"
 	# サーバーステータス辞書を初期化
 	data = {}
-
-	def start_update():
-		executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
-		executor.submit(serverstatus.start_sc)
-
-	def start_sc():
-		serverstatus.update_status()
-		sc = schedule.Scheduler()
-		sc.every(1).minute.do(serverstatus.update_status)
-		while True:
-			sc.run_pending()
-			sleep(1)
 
 	# サーバーステータスを取得して整えて返す
 	def get():
@@ -79,15 +65,13 @@ class serverstatus:
 
 app = App(FastAPI(docs_url="/docs", redoc_url="/redoc", openapi_url="/openapi.json"))
 
-# サーバーステータスの更新を開始
-#serverstatus.start_update()
 # サーバーステータスを更新
 serverstatus.update_status()
 
 @app.lib.cron()
 def cron_task(event):
 	serverstatus.update_status()
-	return "Update\n" + str(serverstatus.data)
+	return "Server Status Updated: " + str(serverstatus.data)
 
 @app.get("/api")
 async def get_serverstatus(platform: List[str] = Query(default=None)):
