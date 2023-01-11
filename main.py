@@ -51,7 +51,11 @@ class serverstatus:
 			for f in s["ImpactedFeatures"]:
 				status[p]["Status"][f] = "Outage"
 
-			status[p]["Maintenance"] = s["Maintenance"]
+			# Maintenance が null の場合はステータスの Maintenance に False をセットする
+			if s["Maintenance"] == None:
+				status[p]["Maintenance"] = False
+			else:
+				status[p]["Maintenance"] = s["ImpactedFeatures"]
 
 		status["_last_update"] = datetime.datetime.utcnow().timestamp()
 
