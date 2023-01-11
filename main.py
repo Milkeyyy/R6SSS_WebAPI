@@ -55,7 +55,7 @@ class serverstatus:
 			if s["Maintenance"] == None:
 				status[p]["Maintenance"] = False
 			else:
-				status[p]["Maintenance"] = s["ImpactedFeatures"]
+				status[p]["Maintenance"] = s["Maintenance"]
 
 		status["_last_update"] = datetime.datetime.utcnow().timestamp()
 
