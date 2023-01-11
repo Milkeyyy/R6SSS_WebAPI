@@ -26,10 +26,10 @@ class serverstatus:
 		res_pc = request.urlopen(request.Request(serverstatus.pc_api_url))
 		#logging.info(str(res_pc.read()))
 
-		# ステータスコードが200出ない場合はNoneを返す
+		# ステータスコードが200ではない場合は不明というステータスを返す
 		if res.status != 200 or res_pc.status != 200:
 			logging.error(f"サーバーステータスの取得に失敗 - ステータスコード: {res.status} / {res_pc.status}")
-			status = {"Unknown": {"Status": {"Connectivity": "Unknown", "Authentication": "Unknown", "Leaderboard": "Unknown", "Matchmaking": "Unknown", "Purchase": "Unknown"}, "Maintenance": None, "ImpactedFeatures": None}, "_update_date": datetime.datetime.utcnow().timestamp()}
+			status = {"Unknown": {"Status": {"Connectivity": "Unknown", "Authentication": "Unknown", "Leaderboard": "Unknown", "Matchmaking": "Unknown", "Purchase": "Unknown"}, "Maintenance": False}, "_last_update": datetime.datetime.utcnow().timestamp()}
 			return status
 
 		raw_status = json.loads(res_pc.read())
@@ -42,17 +42,18 @@ class serverstatus:
 		status = {}
 		for s in raw_status:
 			p = s["Platform"]
-			status[p] = {"Status": {"Connectivity": None, "Authentication": "Operational", "Leaderboard": "Operational", "Matchmaking": "Operational", "Purchase": "Operational"}, "Maintenance": None, "ImpactedFeatures": None}
+			status[p] = {"Status": {"Connectivity": None, "Authentication": "Operational", "Leaderboard": "Operational", "Matchmaking": "Operational", "Purchase": "Operational"}, "Maintenance": None}
+
 			status[p]["Status"]["Connectivity"] = s["Status"]
 			if status[p]["Status"]["Connectivity"] == "Online": status[p]["Status"]["Connectivity"] = "Operational"
 
-			# ImpactedFeatures をループ リストに含まれる場合は停止中なので、該当するステータスをOutageにする
+			# ImpactedFeatures をループする リストに含まれる場合は停止中なので、該当するステータスをOutageにする
 			for f in s["ImpactedFeatures"]:
 				status[p]["Status"][f] = "Outage"
 
 			status[p]["Maintenance"] = s["Maintenance"]
 
-		status["_update_date"] = datetime.datetime.utcnow().timestamp()
+		status["_last_update"] = datetime.datetime.utcnow().timestamp()
 
 		#logging.info(str(status))
 
@@ -80,7 +81,7 @@ async def get_serverstatus(platform: List[str] = Query(default=None)):
 	# パラメーターが指定されていない場合は全てのプラットフォームのステータスを返す
 	if platform == None:
 		status = serverstatus.data
-		if "_update_date" in status.keys(): del status["_update_date"]
+		if "_last_update" in status.keys(): del status["_last_update"]
 	else:
 		# 指定されたプラットフォームのステータスだけ返す
 		#platforms = platforms.split(",")
