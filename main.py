@@ -9,6 +9,7 @@ from fastapi import FastAPI, Query
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 
+version = "1.0.0"
 
 class serverstatus:
 	# サーバーステータスAPIのURL
