@@ -1,0 +1,7 @@
+# Spacefile Docs: https://go.deta.dev/docs/spacefile/v0
+v: 0
+micros:
+  - name: R6SServerStatusBot_WebAPI
+    src: .
+    engine: python3.9
+    primary: true
