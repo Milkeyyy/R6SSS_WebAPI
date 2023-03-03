@@ -7,3 +7,8 @@ micros:
     primary: true
     public_routes:
       - "/*"
+    actions:
+      - id: "update"
+        name: "Update Server Status"
+        trigger: "schedule"
+        default_interval: "0/1 * * * *"

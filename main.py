@@ -4,12 +4,11 @@ import logging
 from typing import List
 from urllib import request
 
-from deta import App
-from fastapi import FastAPI, Query
+from fastapi import Body, FastAPI, Query
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 
-version = "1.0.0"
+version = "1.1.0"
 
 class serverstatus:
 	# サーバーステータスAPIのURL
@@ -30,7 +29,7 @@ class serverstatus:
 		# ステータスコードが200ではない場合は不明というステータスを返す
 		if res.status != 200 or res_pc.status != 200:
 			logging.error(f"サーバーステータスの取得に失敗 - ステータスコード: {res.status} / {res_pc.status}")
-			status = {"Unknown": {"Status": {"Connectivity": "Unknown", "Authentication": "Unknown", "Leaderboard": "Unknown", "Matchmaking": "Unknown", "Purchase": "Unknown"}, "Maintenance": False}, "_last_update": datetime.datetime.utcnow().timestamp()}
+			status = {"Unknown": {"Status": {"Connectivity": "Unknown", "Authentication": "Unknown", "Leaderboard": "Unknown", "Matchmaking": "Unknown", "Purchase": "Unknown"}, "Maintenance": False}, "_Update_At": datetime.datetime.utcnow().timestamp()}
 			return status
 
 		raw_status = json.loads(res_pc.read())
@@ -58,7 +57,7 @@ class serverstatus:
 			else:
 				status[p]["Maintenance"] = s["Maintenance"]
 
-		status["_last_update"] = datetime.datetime.utcnow().timestamp()
+			status[p]["_Update_At"] = datetime.datetime.utcnow().timestamp()
 
 		#logging.info(str(status))
 
@@ -69,15 +68,17 @@ class serverstatus:
 	def update_status():
 		serverstatus.data = serverstatus.get()
 
-app = App(FastAPI(docs_url="/docs", redoc_url="/redoc", openapi_url="/openapi.json"))
+app = FastAPI(docs_url="/docs", redoc_url="/redoc", openapi_url="/openapi.json")
 
 # サーバーステータスを更新
 serverstatus.update_status()
 
-@app.lib.cron()
-def cron_task(event):
-	serverstatus.update_status()
-	return "Server Status Updated: " + str(serverstatus.data)
+@app.post("/__space/v0/actions")
+def update_serverstatus(body=Body(...)):
+	event = body["event"]
+	if event["id"] == "update":
+		serverstatus.update_status()
+		logging.info("Server Status Updated: " + str(serverstatus.data))
 
 @app.get("/")
 async def get_serverstatus(platform: List[str] = Query(default=None)):
