@@ -1,5 +1,8 @@
 # R6SSS Web API
+![R6SSS API](https://cronitor.io/badges/MAB0MW/production/nU_tW7xGKHIHVxRrspK61JDTEP0.svg)
+
 URL: https://api.r6sss.milkeyyy.com
+
 - [**🪅 Discord Bot**](https://github.com/Milkeyyy/R6SServerStatusBot)
 - [**📃 ドキュメント** (適当)](https://api.r6sss.milkeyyy.com/docs)
 
