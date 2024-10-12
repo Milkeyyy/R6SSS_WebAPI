@@ -12,7 +12,19 @@ from fastapi.responses import JSONResponse
 
 version = "1.1.1"
 
-app = FastAPI(docs_url="/docs", redoc_url="/redoc", openapi_url="/openapi.json")
+
+# Lifespan
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+	# サーバーステータスを更新
+	ServerStatusManager.update_status()
+
+	yield
+
+	logging.info("Bye.")
+
+app = FastAPI(lifespan=lifespan, docs_url="/docs", redoc_url="/redoc", openapi_url="/openapi.json")
+
 
 class ServerStatusManager:
 	# サーバーステータスAPIのURL
@@ -99,14 +111,3 @@ async def get_server_status(platform: List[str] = Query(default=None)):
 
 	# JSONでサーバーステータスのデータを返す
 	return JSONResponse(content=jsonable_encoder(status))
-
-
-# Lifespan
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-	# サーバーステータスを更新
-	ServerStatusManager.update_status()
-
-	yield
-
-	logging.info("Bye.")
