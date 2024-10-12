@@ -1,3 +1,4 @@
+from contextlib import asynccontextmanager
 import datetime
 import json
 import logging
@@ -8,9 +9,12 @@ from fastapi import Body, FastAPI, Query
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 
-version = "1.1.0"
 
-class serverstatus:
+version = "1.1.1"
+
+app = FastAPI(docs_url="/docs", redoc_url="/redoc", openapi_url="/openapi.json")
+
+class ServerStatusManager:
 	# サーバーステータスAPIのURL
 	api_url = "https://game-status-api.ubisoft.com/v1/instances?spaceIds=57e580a1-6383-4506-9509-10a390b7e2f1,05bfb3f7-6c21-4c42-be1f-97a33fb5cf66,96c1d424-057e-4ff7-860b-6b9c9222bdbf,98a601e5-ca91-4440-b1c5-753f601a2c90,631d8095-c443-4e21-b301-4af1a0929c27"
 	pc_api_url = "https://game-status-api.ubisoft.com/v1/instances?appIds=e3d5ea9e-50bd-43b7-88bf-39794f4e3d40"
@@ -18,12 +22,13 @@ class serverstatus:
 	data = {}
 
 	# サーバーステータスを取得して整えて返す
-	def get():
+	@classmethod
+	def get(cls):
 		logging.info("サーバーステータスを取得")
 		# サーバーステータスを取得する
-		res = request.urlopen(request.Request(serverstatus.api_url))
+		res = request.urlopen(request.Request(ServerStatusManager.api_url))
 		#logging.info(str(res.read()))
-		res_pc = request.urlopen(request.Request(serverstatus.pc_api_url))
+		res_pc = request.urlopen(request.Request(ServerStatusManager.pc_api_url))
 		#logging.info(str(res_pc.read()))
 
 		# ステータスコードが200ではない場合は不明というステータスを返す
@@ -65,36 +70,43 @@ class serverstatus:
 		logging.info(str(status))
 		return status
 
-	def update_status():
-		serverstatus.data = serverstatus.get()
-
-app = FastAPI(docs_url="/docs", redoc_url="/redoc", openapi_url="/openapi.json")
-
-# サーバーステータスを更新
-serverstatus.update_status()
+	@classmethod
+	def update_status(cls):
+		cls.data = cls.get()
 
 @app.post("/__space/v0/actions")
-def update_serverstatus(body=Body(...)):
+def update_server_status(body=Body(...)):
 	event = body["event"]
 	if event["id"] == "update":
-		serverstatus.update_status()
-		logging.info("Server Status Updated: " + str(serverstatus.data))
+		ServerStatusManager.update_status()
+		logging.info("Server Status Updated: " + str(ServerStatusManager.data))
 
 @app.get("/")
-async def get_serverstatus(platform: List[str] = Query(default=None)):
+async def get_server_status(platform: List[str] = Query(default=None)):
 	status = {}
 
 	# パラメーターが指定されていない場合は全てのプラットフォームのステータスを返す
 	if platform == None:
-		status = serverstatus.data
+		status = ServerStatusManager.data
 		if "_last_update" in status.keys(): del status["_last_update"]
 	else:
 		# 指定されたプラットフォームのステータスだけ返す
 		#platforms = platforms.split(",")
 		for p in platform:
-			d = serverstatus.data.get(p)
+			d = ServerStatusManager.data.get(p)
 			if d != None:
 				status[p] = d
 
 	# JSONでサーバーステータスのデータを返す
 	return JSONResponse(content=jsonable_encoder(status))
+
+
+# Lifespan
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+	# サーバーステータスを更新
+	ServerStatusManager.update_status()
+
+	yield
+
+	logging.info("Bye.")
