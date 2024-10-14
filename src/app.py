@@ -6,35 +6,40 @@ class App:
 
 	data: dict
 
-	@staticmethod
-	def name() -> str:
+	@classmethod
+	def name(cls) -> str:
 		"""名前"""
-		return App.data["name"]
+		return cls.data["name"]
 
-	@staticmethod
-	def description() -> str:
+	@classmethod
+	def description(cls) -> str:
 		"""説明"""
-		return App.data["description"].format(App.name())
+		return cls.data["description"].format(cls.name())
 
-	@staticmethod
-	def version() -> str:
+	@classmethod
+	def version(cls) -> str:
 		"""バージョン"""
-		return App.data["version"]
+		return cls.data["version"]
 
-	@staticmethod
-	def build() -> float:
+	@classmethod
+	def build(cls) -> float:
 		"""内部バージョン"""
-		return App.data["build"]
+		return cls.data["build"]
 
-	@staticmethod
-	def author() -> str:
+	@classmethod
+	def version_text(cls) -> str:
+		"""バージョン表記"""
+		return cls.version() + "-" + str(cls.build())
+
+	@classmethod
+	def author(cls) -> str:
 		"""作者"""
-		return App.data["author"]
+		return cls.data["author"]
 
-	@staticmethod
-	def copyright() -> str:
+	@classmethod
+	def copyright(cls) -> str:
 		"""著作権表記"""
-		return App.data["copyright"].format(App.author())
+		return cls.data["copyright"].format(cls.author())
 
 with open("../app.json", mode="r", encoding="utf-8") as f:
 	App.data = json.loads(f.read())
