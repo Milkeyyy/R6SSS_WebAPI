@@ -1,12 +1,22 @@
 # Spacefile Docs: https://go.deta.dev/docs/spacefile/v0
 v: 0
 micros:
-  - name: R6SServerStatusBot_WebAPI
-    src: .
+  - name: R6SSS_WebAPI_v1
+    src: ./source/v1
+    path: /v1
+    engine: python3.9
+    primary: false
+    public_routes:
+      - "/*"
+
+  - name: R6SSS_WebAPI_v2
+    src: ./source/v2
+    path: /v2
     engine: python3.9
     primary: true
     public_routes:
       - "/*"
+
     actions:
       - id: "update"
         name: "Update Server Status"
