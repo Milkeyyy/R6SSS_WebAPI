@@ -54,15 +54,16 @@ class ServerStatusManager:
 
 	DEFAULT_PLATFORM_STATUS: dict = {
 		"Status": {
-			"Connectivity": None,
+			"Connectivity": "Unknown",
 			"Features": {
-				"Authentication": "Operational",
-				"Leaderboard": "Operational",
-				"Matchmaking": "Operational",
-				"Purchase": "Operational"
+				"Authentication": "Unknown",
+				"Leaderboard": "Unknown",
+				"Matchmaking": "Unknown",
+				"Purchase": "Unknown"
 			},
 		},
-		"Maintenance": None
+		"Maintenance": None,
+		"UpdatedAt": None
 	}
 
 	# サーバーステータス辞書を初期化
@@ -79,7 +80,7 @@ class ServerStatusManager:
 		# ステータスコードが200ではない場合は不明というステータスを返す
 		if res.status != 200 or res_pc.status != 200:
 			logger.error("サーバーステータスの取得に失敗 - ステータスコード: %s / %s", {res.status}, {res_pc.status})
-			status = {"Unknown": {"Status": {"Connectivity": "Unknown", "Authentication": "Unknown", "Leaderboard": "Unknown", "Matchmaking": "Unknown", "Purchase": "Unknown"}, "Maintenance": False}, "_Update_At": datetime.datetime.utcnow().timestamp()}
+			status = cls.DEFAULT_PLATFORM_STATUS.copy()
 			return status
 
 		raw_status = json.loads(res_pc.read())
@@ -91,11 +92,12 @@ class ServerStatusManager:
 		status = {}
 		for s in raw_status:
 			p = s["Platform"]
-			status[p] = cls.DEFAULT_PLATFORM_STATUS
+			status[p] = cls.DEFAULT_PLATFORM_STATUS.copy()
 
-			status[p]["Status"]["Connectivity"] = s["Status"]
-			if status[p]["Status"]["Connectivity"] == "Online":
+			if s["Status"] == "Online":
 				status[p]["Status"]["Connectivity"] = "Operational"
+				for fk in status[p]["Status"]["Features"].keys():
+					status[p]["Status"]["Features"][fk] = "Operational"
 
 			# ImpactedFeatures をループする リストに含まれる場合は停止中なので、該当するステータスをOutageにする
 			for f in s["ImpactedFeatures"]:
@@ -139,8 +141,9 @@ async def update_serverstatus(key: str = None):
 		status_code=200
 	)
 
-@app.get("/status")
-async def get_serverstatus(platform: List[str] = Query(default=None)):
+
+@app.get("/v2/status")
+async def get_server_status_v2(platform: List[str] = Query(default=None)):
 	status = {}
 
 	try:
@@ -163,6 +166,11 @@ async def get_serverstatus(platform: List[str] = Query(default=None)):
 	# JSONでサーバーステータスのデータを返す
 	return JSONResponse(
 		content=jsonable_encoder({
+			"info": { 
+				"name": AppInfo.name(),
+				"version": AppInfo.version_text(),
+				"author": AppInfo.author()
+			},
 			"detail": "OK",
 			"data": status
 		}),
