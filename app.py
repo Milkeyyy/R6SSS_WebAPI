@@ -41,5 +41,5 @@ class App:
 		"""著作権表記"""
 		return cls.data["copyright"].format(cls.author())
 
-with open("../app.json", mode="r", encoding="utf-8") as f:
+with open("./app.json", mode="r", encoding="utf-8") as f:
 	App.data = json.loads(f.read())
