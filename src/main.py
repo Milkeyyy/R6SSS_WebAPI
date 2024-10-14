@@ -1,4 +1,3 @@
-
 import datetime
 import json
 import logging
@@ -10,6 +9,19 @@ from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 
 from app import App
+
+
+# Lifespan
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+	# サーバーステータスを更新
+	ServerStatusManager.update_status()
+
+	yield
+
+	logging.info("Bye.")
+
+app = FastAPI(lifespan=lifespan, docs_url="/docs", redoc_url="/redoc", openapi_url="/openapi.json")
 
 
 class ServerStatus:
@@ -34,23 +46,23 @@ class ServerStatus:
 
 class ServerStatusManager:
 	# サーバーステータスAPIのURL
-	api_url = "https://game-status-api.ubisoft.com/v1/instances?spaceIds=57e580a1-6383-4506-9509-10a390b7e2f1,05bfb3f7-6c21-4c42-be1f-97a33fb5cf66,96c1d424-057e-4ff7-860b-6b9c9222bdbf,98a601e5-ca91-4440-b1c5-753f601a2c90,631d8095-c443-4e21-b301-4af1a0929c27"
-	pc_api_url = "https://game-status-api.ubisoft.com/v1/instances?appIds=e3d5ea9e-50bd-43b7-88bf-39794f4e3d40"
-	# サーバーステータス辞書を初期化
-	data = {}
+	API_URL_OTHER = "https://game-status-api.ubisoft.com/v1/instances?spaceIds=57e580a1-6383-4506-9509-10a390b7e2f1,05bfb3f7-6c21-4c42-be1f-97a33fb5cf66,96c1d424-057e-4ff7-860b-6b9c9222bdbf,98a601e5-ca91-4440-b1c5-753f601a2c90,631d8095-c443-4e21-b301-4af1a0929c27"
+	API_URL_PC = "https://game-status-api.ubisoft.com/v1/instances?appIds=e3d5ea9e-50bd-43b7-88bf-39794f4e3d40"
+	# サーバーステータス辞書
+	data: dict = {}
 
 	# サーバーステータスを取得して整えて返す
-	def get():
+	def get_server_status():
 		logging.info("サーバーステータスを取得")
 		# サーバーステータスを取得する
-		res = request.urlopen(request.Request(ServerStatusManager.api_url))
+		res = request.urlopen(request.Request(ServerStatusManager.API_URL_OTHER))
 		#logging.info(str(res.read()))
-		res_pc = request.urlopen(request.Request(ServerStatusManager.pc_api_url))
+		res_pc = request.urlopen(request.Request(ServerStatusManager.API_URL_PC))
 		#logging.info(str(res_pc.read()))
 
 		# ステータスコードが200ではない場合は不明というステータスを返す
 		if res.status != 200 or res_pc.status != 200:
-			logging.error(f"サーバーステータスの取得に失敗 - ステータスコード: {res.status} / {res_pc.status}")
+			logging.error(f"サーバーステータスの取得に失敗 - ステータスコード: %s / %s", {res.status}, {res_pc.status})
 			status = {"Unknown": {"Status": {"Connectivity": "Unknown", "Authentication": "Unknown", "Leaderboard": "Unknown", "Matchmaking": "Unknown", "Purchase": "Unknown"}, "Maintenance": False}, "_Update_At": datetime.datetime.utcnow().timestamp()}
 			return status
 
@@ -88,7 +100,7 @@ class ServerStatusManager:
 		return status
 
 	def update_status():
-		ServerStatusManager.data = ServerStatusManager.get()
+		ServerStatusManager.data = ServerStatusManager.get_server_status()
 
 app = FastAPI(docs_url="/docs", redoc_url="/redoc", openapi_url="/openapi.json")
 
