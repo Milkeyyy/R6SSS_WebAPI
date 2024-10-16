@@ -1,7 +1,7 @@
 {
-	"name": "R6SSS WebAPI",
-	"version": "2",
-	"build": "2024.0522",
+	"name": "R6SSS Web API",
+	"version": "2.0.0",
+	"build": "0",
 	"author": "Milkeyyy",
 	"copyright": "Copyright (C) 2024 {0}",
 	"description": "Rainbow Six Siege Server Status API (Unofficial)"
