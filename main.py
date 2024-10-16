@@ -61,8 +61,8 @@ class ServerStatusManager:
 				"Matchmaking": "Unknown",
 				"Purchase": "Unknown"
 			},
+			"Maintenance": None
 		},
-		"Maintenance": None,
 		"UpdatedAt": None
 	}
 
@@ -105,9 +105,9 @@ class ServerStatusManager:
 
 			# Maintenance が null の場合はステータスの Maintenance に False をセットする
 			if s["Maintenance"] is None:
-				status[p]["Maintenance"] = False
+				status[p]["Status"]["Maintenance"] = False
 			else:
-				status[p]["Maintenance"] = s["Maintenance"]
+				status[p]["Status"]["Maintenance"] = s["Maintenance"]
 
 			status[p]["UpdatedAt"] = datetime.datetime.now().timestamp()
 
