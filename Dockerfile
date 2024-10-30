@@ -16,4 +16,4 @@ COPY app.json /code/
 COPY log_conf.yaml /code/
 
 # 
-CMD ["uvicorn", "main:app", "--host=0.0.0.0", "--port=80", "--proxy-headers", "--forwarded-allow-ips='*'"]
+CMD ["uvicorn", "main:app", "--log-config=log_conf.yaml", "--host=0.0.0.0", "--port=80", "--proxy-headers", "--forwarded-allow-ips='*'"]

@@ -29,7 +29,19 @@ async def lifespan(app: FastAPI):
 
 	logger.info("Bye.")
 
-limiter = Limiter(key_func=get_ipaddr)
+def get_fwd_ipddr(request: Request) -> str:
+	if "cf-connecting-ip" in request.headers:
+		return request.headers["cf-connecting-ip"]
+
+	if "x-forwarded-for" in request.headers:
+		return request.headers["x-forwarded-for"]
+
+	if not request.client or not request.client.host:
+		return "127.0.0.1"
+
+	return request.client.host
+
+limiter = Limiter(key_func=get_fwd_ipddr)
 app = FastAPI(lifespan=lifespan, docs_url="/docs", redoc_url="/redoc", openapi_url="/openapi.json")
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
@@ -92,7 +104,7 @@ class ServerStatusManager:
 		raw_status = json.loads(res_pc.read())
 		raw_status.extend(json.loads(res.read()))
 		logger.info("取得完了")
-		logger.info(str(raw_status))
+		logger.debug(str(raw_status))
 
 		# 各プラットフォームのステータスをループ、ステータス辞書に加える
 		status = {}
@@ -118,7 +130,7 @@ class ServerStatusManager:
 			status[p]["UpdatedAt"] = datetime.datetime.now().timestamp()
 
 		logger.info("サーバーステータスの整形完了")
-		logger.info(str(status))
+		logger.debug(str(status))
 
 		return status
 
