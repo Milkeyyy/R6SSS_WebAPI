@@ -96,7 +96,7 @@ class ServerStatusManager:
 	async def get_server_status(cls):
 		logger.info("サーバーステータスを取得")
 		# サーバーステータスを取得する
-		async with httpx.AsyncClient() as client:
+		async with httpx.AsyncClient(timeout=15.0) as client:
 			res = await client.get(cls.API_URL) # PC以外
 			res_pc = await client.get(cls.API_URL_PC) # PC
 
