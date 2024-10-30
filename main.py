@@ -6,9 +6,12 @@ import traceback
 from typing import List
 from urllib import request
 
-from fastapi import Body, FastAPI, Query
+from fastapi import FastAPI, Request, Query
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_ipaddr, get_remote_address
+from slowapi.errors import RateLimitExceeded
 
 from app import App as AppInfo
 from logger import logger
@@ -26,7 +29,10 @@ async def lifespan(app: FastAPI):
 
 	logger.info("Bye.")
 
+limiter = Limiter(key_func=get_ipaddr)
 app = FastAPI(lifespan=lifespan, docs_url="/docs", redoc_url="/redoc", openapi_url="/openapi.json")
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 
 class ServerStatus:
@@ -143,7 +149,8 @@ async def update_serverstatus(key: str = None):
 
 
 @app.get("/v2/status")
-async def get_server_status_v2(platform: List[str] = Query(default=None)):
+@limiter.limit("10/minute")
+async def get_server_status_v2(request: Request, platform: List[str] = Query(default=None)):
 	status = {}
 
 	try:
