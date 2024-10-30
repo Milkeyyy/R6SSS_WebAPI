@@ -1,16 +1,14 @@
 from contextlib import asynccontextmanager
 import datetime
-import json
 from os import getenv
 import traceback
 from typing import List
-from urllib import request
 
 from fastapi import FastAPI, Request, Query
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
+import httpx
 from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.util import get_ipaddr, get_remote_address
 from slowapi.errors import RateLimitExceeded
 
 from app import App as AppInfo
@@ -20,16 +18,18 @@ from logger import logger
 # Lifespan
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-	logger.info(f"{AppInfo.name()} - v{AppInfo.version_text()}\nDeveloped by {AppInfo.author()}\n{AppInfo.copyright()}")
+	print(f"{AppInfo.name()} - v{AppInfo.version_text()}\nDeveloped by {AppInfo.author()}\n{AppInfo.copyright()}")
 
 	# サーバーステータスを更新
-	ServerStatusManager.update_status()
+	await ServerStatusManager.update_status()
 
 	yield
 
 	logger.info("Bye.")
 
 def get_fwd_ipddr(request: Request) -> str:
+	"""クライアントのIPアドレスをヘッダーから取得する"""
+
 	if "cf-connecting-ip" in request.headers:
 		return request.headers["cf-connecting-ip"]
 
@@ -41,8 +41,12 @@ def get_fwd_ipddr(request: Request) -> str:
 
 	return request.client.host
 
+# レート制限リミッター
 limiter = Limiter(key_func=get_fwd_ipddr)
+# FastAPI
 app = FastAPI(lifespan=lifespan, docs_url="/docs", redoc_url="/redoc", openapi_url="/openapi.json")
+
+# リミッターを設定
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
@@ -89,20 +93,23 @@ class ServerStatusManager:
 
 	# サーバーステータスを取得して整えて返す
 	@classmethod
-	def get_server_status(cls):
+	async def get_server_status(cls):
 		logger.info("サーバーステータスを取得")
 		# サーバーステータスを取得する
-		res = request.urlopen(request.Request(cls.API_URL))
-		res_pc = request.urlopen(request.Request(cls.API_URL_PC))
+		async with httpx.AsyncClient() as client:
+			res = await client.get(cls.API_URL) # PC以外
+			res_pc = await client.get(cls.API_URL_PC) # PC
 
 		# ステータスコードが200ではない場合は不明というステータスを返す
-		if res.status != 200 or res_pc.status != 200:
-			logger.error("サーバーステータスの取得に失敗 - ステータスコード: %s / %s", {res.status}, {res_pc.status})
+		if res.status_code != 200 or res_pc.status_code != 200:
+			logger.error("サーバーステータスの取得に失敗 - ステータスコード: %s / %s", {res.status_code}, {res_pc.status_code})
 			status = cls.DEFAULT_PLATFORM_STATUS.copy()
 			return status
 
-		raw_status = json.loads(res_pc.read())
-		raw_status.extend(json.loads(res.read()))
+		# PCとそれ以外のプラットフォームのステータスを結合
+		raw_status = res_pc.json()
+		raw_status.extend(res.json())
+
 		logger.info("取得完了")
 		logger.debug(str(raw_status))
 
@@ -135,8 +142,8 @@ class ServerStatusManager:
 		return status
 
 	@classmethod
-	def update_status(cls):
-		cls.data = cls.get_server_status()
+	async def update_status(cls):
+		cls.data = await cls.get_server_status()
 
 
 @app.post("/__update")
@@ -152,7 +159,7 @@ async def update_serverstatus(key: str = None):
 			status_code=401
 		)
 
-	ServerStatusManager.update_status()
+	await ServerStatusManager.update_status()
 	logger.info("Server Status Updated: %s" , str(ServerStatusManager.data))
 	return JSONResponse(
 		content=jsonable_encoder({"detail": "OK"}),
@@ -166,6 +173,7 @@ async def get_server_status_v2(request: Request, platform: List[str] = Query(def
 	status = {}
 
 	try:
+		logger.info("Client IP: %s", get_fwd_ipddr(request))
 		# パラメーターが指定されていない場合は全てのプラットフォームのステータスを返す
 		if platform is None:
 			status = ServerStatusManager.data
