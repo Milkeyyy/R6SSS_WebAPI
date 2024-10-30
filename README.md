@@ -6,7 +6,7 @@
 🪅 Discord Bot: https://github.com/Milkeyyy/R6SSS_Discord
 
 ### エンドポイント
-- `/status` - `GET`
+- [`/status`](https://api-r6sss.milkeyyy.com/v2/status) - `GET`
   #### クエリーパラメーター
   - `platform`
     - `PC`
@@ -34,10 +34,10 @@
             "Leaderboard": "Operational",
             "Matchmaking": "Operational",
             "Purchase": "Operational"
-          }
+          },
+          "Maintenance": false
         },
-        "Maintenance": false,
-        "UpdatedAt": 1728921810.32845
+        "UpdatedAt": 1730275264.15424
       },
       "PS4": {
         "Status": {
@@ -47,10 +47,10 @@
             "Leaderboard": "Operational",
             "Matchmaking": "Operational",
             "Purchase": "Operational"
-          }
+          },
+          "Maintenance": false
         },
-        "Maintenance": false,
-        "UpdatedAt": 1728921810.32848
+        "UpdatedAt": 1730275264.15424
       },
       "PS5": {
         "Status": {
@@ -60,10 +60,10 @@
             "Leaderboard": "Operational",
             "Matchmaking": "Operational",
             "Purchase": "Operational"
-          }
+          },
+          "Maintenance": false
         },
-        "Maintenance": false,
-        "UpdatedAt": 1728921810.32849
+        "UpdatedAt": 1730275264.15424
       },
       "XBOXONE": {
         "Status": {
@@ -73,10 +73,10 @@
             "Leaderboard": "Operational",
             "Matchmaking": "Operational",
             "Purchase": "Operational"
-          }
+          },
+          "Maintenance": false
         },
-        "Maintenance": false,
-        "UpdatedAt": 1728921810.32849
+        "UpdatedAt": 1730275264.15425
       },
       "XBOX SERIES X": {
         "Status": {
@@ -86,10 +86,10 @@
             "Leaderboard": "Operational",
             "Matchmaking": "Operational",
             "Purchase": "Operational"
-          }
+          },
+          "Maintenance": false
         },
-        "Maintenance": false,
-        "UpdatedAt": 1728921810.32849
+        "UpdatedAt": 1730275264.15425
       }
     }
   }
@@ -113,10 +113,10 @@
             "Leaderboard": "Operational",
             "Matchmaking": "Operational",
             "Purchase": "Operational"
-          }
+          },
+          "Maintenance": false
         },
-        "Maintenance": false,
-        "UpdatedAt": 1728921810.32848
+        "UpdatedAt": 1730275323.54746
       },
       "PS5": {
         "Status": {
@@ -126,10 +126,10 @@
             "Leaderboard": "Operational",
             "Matchmaking": "Operational",
             "Purchase": "Operational"
-          }
+          },
+          "Maintenance": false
         },
-        "Maintenance": false,
-        "UpdatedAt": 1728921810.32849
+        "UpdatedAt": 1730275323.54747
       }
     }
   }
