@@ -1,9 +1,11 @@
 from contextlib import asynccontextmanager
 import datetime
+import os
 from os import getenv
 import traceback
 from typing import List
 
+from dotenv import load_dotenv
 from fastapi import FastAPI, Request, Query
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
@@ -12,6 +14,7 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
 from app import App as AppInfo
+import db
 from logger import logger
 
 
@@ -19,6 +22,15 @@ from logger import logger
 @asynccontextmanager
 async def lifespan(app: FastAPI):
 	print(f"{AppInfo.name()} - v{AppInfo.version_text()}\nDeveloped by {AppInfo.author()}\n{AppInfo.copyright()}")
+
+	# .envファイルが存在する場合はファイルから環境変数を読み込む
+	env_path = os.path.join(os.getcwd(), ".env")
+	if os.path.isfile(env_path):
+		logger.info("環境変数を読み込み: %s", env_path)
+		load_dotenv(env_path)
+
+	# スケジュールDBへ接続
+	db.connect()
 
 	# サーバーステータスを更新
 	await ServerStatusManager.update_status()
@@ -200,6 +212,65 @@ async def get_server_status_v2(request: Request, platform: List[str] = Query(def
 			},
 			"detail": "OK",
 			"data": status
+		}),
+		status_code=200
+	)
+
+@app.get("/v2/schedule/latest")
+@limiter.limit("10/minute")
+async def get_latest_maintenance_schedule_v2(request: Request):
+	try:
+		logger.info("Client IP: %s", get_fwd_ipddr(request))
+
+		# データベースからスケジュール情報を取得
+		data = db.collection.find_one(sort=([("_id", db.pymongo.DESCENDING),]))
+
+		if data is None:
+			return JSONResponse(content=jsonable_encoder({"detail": "No schedule information found.", "result": False, "data": data}), status_code=404)
+
+		# 取得したデータからIDを削除する
+		data.pop("_id")
+
+		# JSONでスケジュールのデータを返す
+		return JSONResponse(
+			content=jsonable_encoder({
+				"info": { 
+					"name": AppInfo.name(),
+					"version": AppInfo.version_text(),
+					"author": AppInfo.author()
+				},
+				"detail": "OK",
+				"data": data
+			}),
+			status_code=200
+		)
+
+		# パラメーターが指定されていない場合は全てのプラットフォームのステータスを返す
+		# if platform is None:
+		# 	status = ServerStatusManager.data
+		# else:
+		# 	# 指定されたプラットフォームのステータスだけ返す
+		# 	for p in platform:
+		# 		d = ServerStatusManager.data.get(p)
+		# 		if d is not None:
+		# 			status[p] = d
+	except Exception:
+		logger.error(traceback.format_exc())
+		return JSONResponse(
+			content=jsonable_encoder({"detail": "Internal Server Error"}),
+			status_code=500
+		)
+
+	# JSONでサーバーステータスのデータを返す
+	return JSONResponse(
+		content=jsonable_encoder({
+			"info": { 
+				"name": AppInfo.name(),
+				"version": AppInfo.version_text(),
+				"author": AppInfo.author()
+			},
+			"detail": "OK",
+			"data": data
 		}),
 		status_code=200
 	)
