@@ -12,8 +12,8 @@
     - `PC`
     - `PS4`
     - `PS5`
-    - `XBOXONE`
-    - `XBOX SERIES X`
+    - `XB1`
+    - `XBSX`
 
 ### 例
 - `GET` - `https://api-r6sss.milkeyyy.com/v2/status`
@@ -65,7 +65,7 @@
         },
         "UpdatedAt": 1730275264.15424
       },
-      "XBOXONE": {
+      "XB1": {
         "Status": {
           "Connectivity": "Operational",
           "Features": {
@@ -78,7 +78,7 @@
         },
         "UpdatedAt": 1730275264.15425
       },
-      "XBOX SERIES X": {
+      "XBSX": {
         "Status": {
           "Connectivity": "Operational",
           "Features": {
