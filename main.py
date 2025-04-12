@@ -83,8 +83,16 @@ class ServerStatus:
 
 class ServerStatusManager:
 	# サーバーステータスAPIのURL
-	API_URL = "https://game-status-api.ubisoft.com/v1/instances?spaceIds=57e580a1-6383-4506-9509-10a390b7e2f1,05bfb3f7-6c21-4c42-be1f-97a33fb5cf66,96c1d424-057e-4ff7-860b-6b9c9222bdbf,98a601e5-ca91-4440-b1c5-753f601a2c90,631d8095-c443-4e21-b301-4af1a0929c27"
-	API_URL_PC = "https://game-status-api.ubisoft.com/v1/instances?appIds=e3d5ea9e-50bd-43b7-88bf-39794f4e3d40"
+	# API_URL = "https://game-status-api.ubisoft.com/v1/instances?spaceIds=57e580a1-6383-4506-9509-10a390b7e2f1,05bfb3f7-6c21-4c42-be1f-97a33fb5cf66,96c1d424-057e-4ff7-860b-6b9c9222bdbf,98a601e5-ca91-4440-b1c5-753f601a2c90,631d8095-c443-4e21-b301-4af1a0929c27"
+	# API_URL_PC = "https://game-status-api.ubisoft.com/v1/instances?appIds=e3d5ea9e-50bd-43b7-88bf-39794f4e3d40"
+	API_URL = "https://public-ubiservices.ubi.com/v1/applications/gameStatuses"
+	API_URL_QUERY_PF = [ # アプリケーションID一覧
+		"e3d5ea9e-50bd-43b7-88bf-39794f4e3d40", # PC
+		"fb4cc4c9-2063-461d-a1e8-84a7d36525fc", # PS4
+		"4008612d-3baf-49e4-957a-33066726a7bc", # Xbox One
+		"6e3c99c9-6c3f-43f4-b4f6-f1a3143f2764", # PS5
+		"76f580d5-7f50-47cc-bbc1-152d000bfe59"  # Xbox Series X/S
+	]
 
 	DEFAULT_PLATFORM_STATUS: dict = {
 		"Status": {
@@ -109,44 +117,67 @@ class ServerStatusManager:
 		logger.info("サーバーステータスを取得")
 		# サーバーステータスを取得する
 		async with httpx.AsyncClient(timeout=15.0) as client:
-			res = await client.get(cls.API_URL) # PC以外
-			res_pc = await client.get(cls.API_URL_PC) # PC
+			res = await client.get(
+				cls.API_URL,
+				params={
+					"applicationIds": ",".join(cls.API_URL_QUERY_PF)
+				},
+				headers={
+					"Ubi-Appid": "f612511e-58a2-4e9a-831f-61838b1950bb",
+					"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36"
+				}
+			) # PC以外
 
 		# ステータスコードが200ではない場合は不明というステータスを返す
-		if res.status_code != 200 or res_pc.status_code != 200:
-			logger.error("サーバーステータスの取得に失敗 - ステータスコード: %s / %s", {res.status_code}, {res_pc.status_code})
+		if res.status_code != 200:
+			logger.error("サーバーステータスの取得に失敗 - ステータスコード: %s", {res.status_code})
 			status = cls.DEFAULT_PLATFORM_STATUS.copy()
 			return status
 
-		# PCとそれ以外のプラットフォームのステータスを結合
-		raw_status = res_pc.json()
-		raw_status.extend(res.json())
+		raw_status = res.json()
+		game_statuses = None
+
+		if len(raw_status["gameStatuses"]) > 0:
+			game_statuses = raw_status["gameStatuses"]
+
+		if game_statuses is None:
+			logger.error("取得失敗")
+			logger.debug(str(raw_status))
+			return cls.data
 
 		logger.info("取得完了")
 		logger.debug(str(raw_status))
 
 		# 各プラットフォームのステータスをループ、ステータス辞書に加える
 		status = {}
-		for s in raw_status:
-			p = s["Platform"]
+		for s in game_statuses:
+			p = s["platformType"]
+			# プラットフォームのキーを以前のものへ戻す
+			if p == "ORBIS":
+				p = "PS4"
+			elif p == "DURANGO":
+				p = "XB1"
+			elif p == "XboxScarlett":
+				p = "XBSX"
 			status[p] = cls.DEFAULT_PLATFORM_STATUS.copy()
 
-			if s["Status"] == "Online":
+			if s["status"] == "online":
 				status[p]["Status"]["Connectivity"] = "Operational"
 				for fk in status[p]["Status"]["Features"].keys():
 					status[p]["Status"]["Features"][fk] = "Operational"
 
 			# ImpactedFeatures をループする リストに含まれる場合は停止中なので、該当するステータスをOutageにする
-			for f in s["ImpactedFeatures"]:
+			for f in s["impactedFeatures"]:
 				status[p]["Status"]["Features"][f] = "Outage"
 
 			# Maintenance が null の場合はステータスの Maintenance に False をセットする
-			if s["Maintenance"] is None:
+			if s["isMaintenance"] == False:
 				status[p]["Status"]["Maintenance"] = False
 			else:
-				status[p]["Status"]["Maintenance"] = s["Maintenance"]
+				status[p]["Status"]["Maintenance"] = s["isMaintenance"]
 
-			status[p]["UpdatedAt"] = datetime.datetime.now().timestamp()
+			# 最終更新日時を更新する
+			status[p]["UpdatedAt"] = datetime.datetime.fromisoformat(raw_status["lastModifiedAt"]).timestamp()
 
 		logger.info("サーバーステータスの整形完了")
 		logger.debug(str(status))
