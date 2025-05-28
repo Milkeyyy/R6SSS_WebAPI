@@ -16,6 +16,7 @@ from slowapi.errors import RateLimitExceeded
 from app import App as AppInfo
 import db
 from logger import logger
+from utilities import reorder_dict_with_remaining
 
 
 # Lifespan
@@ -53,7 +54,7 @@ def get_fwd_ipddr(request: Request) -> str:
 
 	return request.client.host
 
-# レート制限リミッター
+# レート制限用リミッター
 limiter = Limiter(key_func=get_fwd_ipddr)
 # FastAPI
 app = FastAPI(lifespan=lifespan, docs_url="/docs", redoc_url="/redoc", openapi_url="/openapi.json")
@@ -83,8 +84,6 @@ class ServerStatus:
 
 class ServerStatusManager:
 	# サーバーステータスAPIのURL
-	# API_URL = "https://game-status-api.ubisoft.com/v1/instances?spaceIds=57e580a1-6383-4506-9509-10a390b7e2f1,05bfb3f7-6c21-4c42-be1f-97a33fb5cf66,96c1d424-057e-4ff7-860b-6b9c9222bdbf,98a601e5-ca91-4440-b1c5-753f601a2c90,631d8095-c443-4e21-b301-4af1a0929c27"
-	# API_URL_PC = "https://game-status-api.ubisoft.com/v1/instances?appIds=e3d5ea9e-50bd-43b7-88bf-39794f4e3d40"
 	API_URL = "https://public-ubiservices.ubi.com/v1/applications/gameStatuses"
 	API_URL_QUERY_PF = [ # アプリケーションID一覧
 		"e3d5ea9e-50bd-43b7-88bf-39794f4e3d40", # PC
@@ -126,7 +125,7 @@ class ServerStatusManager:
 					"Ubi-Appid": "f612511e-58a2-4e9a-831f-61838b1950bb",
 					"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36"
 				}
-			) # PC以外
+			)
 
 		# ステータスコードが200ではない場合は不明というステータスを返す
 		if res.status_code != 200:
@@ -170,14 +169,14 @@ class ServerStatusManager:
 			for f in s["impactedFeatures"]:
 				status[p]["Status"]["Features"][f] = "Outage"
 
-			# Maintenance が null の場合はステータスの Maintenance に False をセットする
-			if s["isMaintenance"] == False:
-				status[p]["Status"]["Maintenance"] = False
-			else:
-				status[p]["Status"]["Maintenance"] = s["isMaintenance"]
+			# メンテナンスかどうか
+			status[p]["Status"]["Maintenance"] = s["isMaintenance"]
 
 			# 最終更新日時を更新する
 			status[p]["UpdatedAt"] = datetime.datetime.fromisoformat(raw_status["lastModifiedAt"]).timestamp()
+
+		# ステータスの辞書を指定のプラットフォーム順に並べ替える
+		status = reorder_dict_with_remaining(status, ["PC", "PS4", "PS5", "XB1", "XBSX"])
 
 		logger.info("サーバーステータスの整形完了")
 		logger.debug(str(status))
@@ -190,7 +189,7 @@ class ServerStatusManager:
 
 
 @app.post("/__update")
-async def update_serverstatus(key: str = None):
+async def update_serverstatus(key: str | None = None):
 	if key is None:
 		return JSONResponse(
 			content=jsonable_encoder({"detail": "Key is undefined"}),
@@ -247,17 +246,21 @@ async def get_server_status_v2(request: Request, platform: List[str] = Query(def
 		status_code=200
 	)
 
-@app.get("/v2/schedule/latest")
+@app.get("/v2/schedule/recent")
 @limiter.limit("10/minute")
-async def get_latest_maintenance_schedule_v2(request: Request):
+async def get_recent_maintenance_schedule_v2(request: Request):
 	try:
 		logger.info("Client IP: %s", get_fwd_ipddr(request))
 
-		# データベースからスケジュール情報を取得
-		data = db.collection.find_one(sort=([("_id", db.pymongo.DESCENDING),]))
+		# データベースからスケジュール情報を取得 (最も近い日時のスケジュールを取得)
+		sched_list = db.collection.find().sort({"Timestamp": 1}).limit(1).to_list()
 
-		if data is None:
+		# 取得できなかった場合は404 TODO: 要改善
+		if sched_list is None:
 			return JSONResponse(content=jsonable_encoder({"detail": "No schedule information found.", "result": False, "data": data}), status_code=404)
+
+		# 直近のスケジュールを取得
+		data = sched_list[0]
 
 		# 取得したデータからIDを削除する
 		data.pop("_id")
@@ -276,15 +279,6 @@ async def get_latest_maintenance_schedule_v2(request: Request):
 			status_code=200
 		)
 
-		# パラメーターが指定されていない場合は全てのプラットフォームのステータスを返す
-		# if platform is None:
-		# 	status = ServerStatusManager.data
-		# else:
-		# 	# 指定されたプラットフォームのステータスだけ返す
-		# 	for p in platform:
-		# 		d = ServerStatusManager.data.get(p)
-		# 		if d is not None:
-		# 			status[p] = d
 	except Exception:
 		logger.error(traceback.format_exc())
 		return JSONResponse(
@@ -292,16 +286,42 @@ async def get_latest_maintenance_schedule_v2(request: Request):
 			status_code=500
 		)
 
-	# JSONでサーバーステータスのデータを返す
-	return JSONResponse(
-		content=jsonable_encoder({
-			"info": { 
-				"name": AppInfo.name(),
-				"version": AppInfo.version_text(),
-				"author": AppInfo.author()
-			},
-			"detail": "OK",
-			"data": data
-		}),
-		status_code=200
-	)
+@app.get("/v2/schedule/latest")
+@limiter.limit("10/minute")
+async def get_latest_maintenance_schedule_v2(request: Request):
+	try:
+		logger.info("Client IP: %s", get_fwd_ipddr(request))
+
+		# データベースからスケジュール情報を取得 (最も遠い日時のスケジュールを取得)
+		sched_list = db.collection.find().sort({"Timestamp": -1}).limit(1).to_list()
+
+		# 取得できなかった場合は404 TODO: 要改善
+		if sched_list is None:
+			return JSONResponse(content=jsonable_encoder({"detail": "No schedule information found.", "result": False, "data": data}), status_code=404)
+
+		# 直近のスケジュールを取得
+		data = sched_list[0]
+
+		# 取得したデータからIDを削除する
+		data.pop("_id")
+
+		# JSONでスケジュールのデータを返す
+		return JSONResponse(
+			content=jsonable_encoder({
+				"info": { 
+					"name": AppInfo.name(),
+					"version": AppInfo.version_text(),
+					"author": AppInfo.author()
+				},
+				"detail": "OK",
+				"data": data
+			}),
+			status_code=200
+		)
+
+	except Exception:
+		logger.error(traceback.format_exc())
+		return JSONResponse(
+			content=jsonable_encoder({"detail": "Internal Server Error"}),
+			status_code=500
+		)
